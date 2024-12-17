@@ -17,8 +17,9 @@ setwd("C:/Docs/MIRO/vegetation_model")
 # Phenology Observations
 obs    <- read.csv("Phenology_Observations.csv")
 
-# Subset to bud break data since 1995
-obs    <- obs[obs$Phase_id == 3 & obs$Referenzjahr >= 1995,]
+# Subset to bud break data since 1996
+obs    <- obs[obs$Phase_id == 3 & obs$Referenzjahr > 1995,]
+
 
 # Load Station Data
 stats   <- read.table("PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt", 
@@ -42,15 +43,11 @@ points_df <- as.data.frame(st_coordinates(obs_sf))
 
 
 ggplot() +
-  #geom_density_2d(data = points_df, aes(X, Y), color = "blue") +  # Contour lines
   geom_hex(data = points_df, aes(X, Y), binwidth = c(0.5,0.5)) +
-  #stat_density_2d(data = points_df, aes(X, Y, fill = ..level..), geom = "polygon") +  # Filled density
   geom_sf(data = DE, fill = NA, color = "black") +  # Add Germany boundary
   scale_fill_viridis_c() +  # Use a nice color scale
   coord_sf() +
-  labs(title = "Location of Bud Break Observations",
-       x = "", y = "",
-       fill = "Density") +
+  labs(x = "", y = "", fill = "Observation\ncount") +
   theme_bw() +
   geom_sf(data = obs_sf, color = "black", alpha = 0.02)
 ggsave("./plots/DensityMap_All.png", units = "cm", dpi = 300,
