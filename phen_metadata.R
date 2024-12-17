@@ -9,7 +9,7 @@ library(tidyverse)
 library(terra)
 library(sf)
 library(Kendall)
-
+library(gridExtra)
 
 # Load Data
 setwd("C:/Docs/MIRO/vegetation_model")
@@ -105,8 +105,6 @@ doy <- doy[doy$n >= 10,]
 
 
 # Assign Data back to obs df
-#obs2 <- obs
-#obs <- obs2
 obs <- left_join(obs, doy, by = c("Stations_id", "SORTE"))
 
 # Calculate anomaly around mean
@@ -121,6 +119,23 @@ ggplot(obs[obs$SORTE != "unidentified" & obs$anomaly <= 100 & !is.na(obs$anomaly
   geom_smooth(method = "lm", se = F)
 ggsave("./plots/Anomaly_around_meanDOY.png", units = "cm", dpi = 300,
        width = 25, height = 20)
+
+
+# Extract slope of model & significance of trend
+statistics <- obs[obs$SORTE != "unidentified" & obs$anomaly <= 100 & !is.na(obs$anomaly),] %>%
+  group_by(SORTE) %>%
+  summarize(slope = lm(anomaly ~ Referenzjahr)$coefficients[2],
+            sig = MannKendall(anomaly)[["sl"]])
+
+grid.arrange(
+  ggplot(statistics, aes(x = SORTE, y = slope)) +
+  geom_point() + theme_bw() + geom_hline(yintercept = 0, linetype = "dashed") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)),
+  
+  ggplot(statistics, aes(x = SORTE, y = sig)) +
+    geom_point() + theme_bw() + geom_hline(yintercept = 0.05, linetype = "dashed") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)))
+
 
 
   # Cultivar specific density maps
