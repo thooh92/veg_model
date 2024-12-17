@@ -105,119 +105,13 @@ obs$SORTE[obs$SORTE == unique(obs$SORTE)[44]] <- "Brettacher"
 obs$SORTE[obs$SORTE == unique(obs$SORTE)[53]] <- "Conference"
 
 
+
+# Remove data based on Quality Flags
+obs <- obs[obs$Qualitaetsniveau == 10,]
+obs <- obs[obs$Eintrittsdatum_QB < 5,]
+
+1-593880/597569 # Removed data, 0.62%
+
+
 # write obs
 write.csv(obs, "Phenology_Observations.csv", row.names = F)
-
-
-# Subset to budbreak
-bb    <- obs[obs$Phase_id == 3,]
-
-
-### Create Validation Data for Bud Break Submodel
-# Subset station info +
-stats   <- stats[stats$Stations_id %in% bb$Stations_id,]
-
-# Load data.frame
-weather_dat <- read.csv("Station_urls.csv")
-
-l_subs <- c()
-
-
-# URLs can outdate for historical data; thus search URL using station number
-library(RCurl)
-ftp_url <- "ftp://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/hourly/air_temperature/historical/"
-
-# List files in the FTP directory
-files <- getURL(ftp_url, ftp.use.epsv = FALSE, dirlistonly = TRUE)
-file_list <- strsplit(files, "\r*\n")[[1]]
-
-
-# Download data
-for(j in 1:length(unique(weather_dat$phen_id))){
-  print(j)
-  
-  # Subset to corresponding weather station IDs
-  weather_sub <- weather_dat[weather_dat$phen_id == unique(weather_dat$phen_id)[j],]
-  
-  # Get elevation of phenology stations
-  phen_ele    <- stats$Stationshoehe[stats$Stations_id == unique(weather_dat$phen_id)[j]]
-  
-  # Remove weather data with > 100 m elevation differences (if applicable)
-  weather_sub <- weather_sub[abs(weather_sub$Stationshoehe - phen_ele) < 100,]
-  
-  # Get URL for data file with lowest distance
-  inds    <- which(weather_sub$dist == min(weather_sub$dist))
-  nearest <- weather_sub[inds,]
-  
-  
-  # Download data of first station
-    # Create correct URL
-  statid  <- ifelse(nchar(nearest$Stations_id) == 4, paste0(0,nearest$Stations_id), 
-                    ifelse(nchar(nearest$Stations_id) == 3, paste0(0,0,nearest$Stations_id), 
-                           ifelse(nchar(nearest$Stations_id) == 2, paste0(0,0,0,nearest$Stations_id),
-                           ifelse(nchar(nearest$Stations_id) == 1, paste0(0,0,0,0,nearest$Stations_id),nearest$Stations_id))))
-  url     <- file_list[file_list %like% paste0("TU_",statid)]
-  
-    # Get data
-  dat     <- dataDWD(paste0(ftp_url, url), varnames = T)
-  
-  # Assign relevant info to dat data.frame
-  dat$phen_id <- nearest$phen_id
-  dat$dist    <- nearest$dist
-  
-  # Are there any additional dates covered by stations with greater distance?
-  subs <- weather_sub[which(weather_sub$von_datum < weather_sub$von_datum[inds] |
-                  weather_sub$bis_datum > weather_sub$bis_datum[inds]),]
-  
-  
-  # Loop through remaining indices
-  while(nrow(subs) > 0){
-    # Get next nearest weather station index
-    ind  <- which(subs$dist == min(subs$dist))
-    
-    # Get next nearest data
-    nearest <- subs[ind,]
-    
-    # Download data of first station
-    # Create correct URL
-    statid  <- ifelse(nchar(nearest$Stations_id) == 4, paste0(0,nearest$Stations_id), 
-                      ifelse(nchar(nearest$Stations_id) == 3, paste0(0,0,nearest$Stations_id), 
-                             ifelse(nchar(nearest$Stations_id) == 2, paste0(0,0,0,nearest$Stations_id),
-                                    ifelse(nchar(nearest$Stations_id) == 1, paste0(0,0,0,0,nearest$Stations_id),nearest$Stations_id))))
-    url     <- file_list[file_list %like% paste0("TU_",statid)]
-    
-    # Get data
-    da     <- dataDWD(paste0(ftp_url, url), varnames = T)
-    
-    # Assign relevant info to dat data.frame
-    da$phen_id <- nearest$phen_id
-    da$dist    <- nearest$dist
-    
-    # Remove data with any already covered date
-    da         <- da[!da$MESS_DATUM %in% dat$MESS_DATUM,]
-    
-    # Unite with preceding data.frame
-    dat        <- rbind(dat, da)
-    
-    # Are there any additional dates covered by stations with greater distance?
-    subs <- subs[which(subs$von_datum < subs$von_datum[ind] |
-                         subs$bis_datum > subs$bis_datum[ind]),]
-  }
-  # Change Mess-Datum to character
-  dat$MESS_DATUM <- format(dat$MESS_DATUM, format = "%Y-%m-%d %H:%M:%S")
-  
-  
-  # Check for NAs
-  dat_NA   <- dat[is.na(dat$TT_TU.Lufttemperatur),]
-  
-  # Save Data Frame with Phenology ID
-  write.csv(dat, paste0("./data/bud_break/", unique(weather_dat$phen_id)[j],".csv"),
-            row.names = F)
-  
-  # Store csv in minio
-  
-  
-  # Delete local csv
-  
-}
-
