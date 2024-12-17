@@ -8,6 +8,7 @@ rm(list = ls())
 library(tidyverse)
 library(terra)
 library(sf)
+library(Kendall)
 
 
 # Load Data
@@ -42,7 +43,8 @@ points_df <- as.data.frame(st_coordinates(obs_sf))
 
 ggplot() +
   #geom_density_2d(data = points_df, aes(X, Y), color = "blue") +  # Contour lines
-  stat_density_2d(data = points_df, aes(X, Y, fill = ..level..), geom = "polygon") +  # Filled density
+  geom_hex(data = points_df, aes(X, Y), binwidth = c(0.5,0.5)) +
+  #stat_density_2d(data = points_df, aes(X, Y, fill = ..level..), geom = "polygon") +  # Filled density
   geom_sf(data = DE, fill = NA, color = "black") +  # Add Germany boundary
   scale_fill_viridis_c() +  # Use a nice color scale
   coord_sf() +
