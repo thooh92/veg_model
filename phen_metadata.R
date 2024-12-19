@@ -186,37 +186,22 @@ for(i in 1:length(unique(statistics$SORTE))){
          units = "cm", dpi = 300, width = 25, height = 15)
 }
 
-
-
-  # Cultivar specific density maps
+# Cultivar specific density maps
 points_df$SORTE <- obs$SORTE
-
-
-  # Produce new obs_sf
-obs_sf_new <- vect(points_df, geom = c("X", "Y"), crs = "EPSG:4326")
-obs_sf_new <- st_as_sf(obs_sf_new)
-
-ggplot() +
-  geom_sf(data = obs_sf_new[obs_sf_new$SORTE != "unidentified",], 
-          color = "black", alpha = 0.2) +
-  facet_wrap(~SORTE) + coord_sf() + theme_bw() +
-  geom_sf(data = DE, fill = NA, color = "black")
-
-
+points_df$Phase <- obs$Phase
 
 
 # Plot density maps for specific cultivars
 for(i in 1:length(unique(points_df$SORTE))){
+  print(i)
+  
   # Loop through cultivars
   brettacher <- points_df[points_df$SORTE == unique(points_df$SORTE)[i],]
   brettacher_sf <- st_as_sf(vect(brettacher, geom = c("X", "Y"), crs = "EPSG:4326"))
   
   ggplot() +
-   # stat_density_2d(data = brettacher, aes(X, Y, fill = ..level..), geom = "polygon", 
-     #               n = 10, adjust = 5) +
     geom_hex(data = brettacher, aes(X, Y), binwidth = c(0.5,0.5)) +
-    #geom_bin2d(data = brettacher, aes(X, Y)) +
-    geom_sf(data = brettacher_sf, color = "black", fill = "white", alpha = 0.4, shape = 21) +
+    geom_sf(data = brettacher_sf, color = "black", fill = "white", alpha = 0.05, shape = 21) +
     geom_sf(data = DE, fill = NA, color = "black") +  # Add Germany boundary
     scale_fill_viridis_c() +
     coord_sf() +
@@ -224,9 +209,9 @@ for(i in 1:length(unique(points_df$SORTE))){
          fill = "Count",
          x = "Longitude",
          y = "Latitude") +
-    theme_bw()
+    theme_bw() + facet_wrap(~Phase)
   ggsave(paste0("./plots/DensityMap_",unique(points_df$SORTE)[i],".png"), units = "cm", dpi = 300,
-         width = 12, height = 15)
+         width = 25, height = 15)
 }
 
 
