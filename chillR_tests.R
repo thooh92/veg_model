@@ -26,11 +26,12 @@ files <- list.files()
 
 for(k in 1:254){
   print(k)
-  
-  
-  # Load exemplary data
+
+  # Load weather data
   dat   <- read.csv(files[k])
   
+   # Load coresponding phenology data
+  Obs_sub    <- obs[obs$Stations_id == unique(dat$phen_ID),]
   
   # Manipulate datetime format
   dat$time <- as.POSIXct(dat$time, format = "%Y-%m-%d %H:%M:%S")
@@ -41,7 +42,9 @@ for(k in 1:254){
   
   # Assign "phenological year" info; i.e. divide timeline starting July
   dat$phen_year <- ifelse(dat$doy > 182, dat$year + 1, dat$year)
-  dat           <- dat[dat$phen_year != 1995,]
+  dat           <- dat[!is.na(dat$phen_year) &
+                         dat$phen_year %in% Obs_sub$Referenzjahr,]
+  
   
   # Remove NAs
   dat   <- dat[!is.na(dat$air_temperature),]
@@ -52,6 +55,7 @@ for(k in 1:254){
     group_by(phen_year) %>%
     mutate(utah = Utah_Model(air_temperature),
            dyn = Dynamic_Model(air_temperature),
+           GDH = GDH(air_temperature),
            doy_July = 1:length(air_temperature)/24) %>%
     ungroup
   
@@ -60,24 +64,30 @@ for(k in 1:254){
     ggplot(dat[!is.na(dat$year),], aes(x = doy_July, y = utah, 
                                      color = as.factor(phen_year))) +
     geom_line() + theme_bw() +
-    labs(x = "Day after July 1st", y = "Accumulated Utah Chill Units",
+    labs(x = "Day after July 1st", y = "Accumulated\nUtah Chill Units",
          color = "Phenological Year"),
+    
     ggplot(dat[!is.na(dat$year),], aes(x = doy_July, y = dyn, 
                                        color = as.factor(phen_year))) +
       geom_line() + theme_bw() +
-      labs(x = "Day after July 1st", y = "Accumulated Chill Portions",
+      labs(x = "Day after July 1st", y = "Accumulated\nChill Portions",
+           color = "Phenological Year"),
+    
+    ggplot(dat[!is.na(dat$year),], aes(x = doy_July, y = GDH, 
+                                       color = as.factor(phen_year))) +
+      geom_line() + theme_bw() +
+      labs(x = "Day after July 1st", y = "Accumulated\nGDH",
            color = "Phenological Year"))
 
   # Extract starting day of chill accumulation according to Utah logic
   Chill_start <- dat[!is.na(dat$phen_year),] %>% 
     group_by(phen_year) %>% 
-    summarize(utah_time = time[which.min(utah)],
-              dyn_time = time[which.min(dyn)])
+    summarize(start = as.POSIXct(paste0(unique(phen_year)-1,"-09-01"), format = "%Y-%m-%d"))
   
   
   # Corresponding bud break dates
   dat        <- dat[!is.na(dat$phen_ID),]
-  Obs_sub    <- obs[obs$Stations_id == unique(dat$phen_ID),]
+  
   
   
   #  Summarize chill period in one data.frame
@@ -85,27 +95,22 @@ for(k in 1:254){
   Chill_period    <- Chill_period[!is.na(Chill_period$Stations_id),]
   
   
-  # Extract Chill Hour Accumulation for each period
+  # Extract Chill & Heat Accumulation for each period
   Chill_period$utah_acc <- NA
   Chill_period$dyn_acc  <- NA
+  Chill_period$GDH      <- NA 
+  
   
   for(i in 1:nrow(Chill_period)){
     ## UTAH MODEL
     # Subset to period
-    utah_sub <- dat[dat$time >= Chill_period$utah_time[i] &
+    sub <- dat[dat$time >= Chill_period$start[i] &
                       dat$time < Chill_period$bb_datetime[i],]
     
     # Calculate difference between min and max chill accumulation within period
-    Chill_period$utah_acc[i] <- max(utah_sub$utah) - min(utah_sub$utah)
-    
-    ## DYNAMIC MODEL
-    # Subset to period
-    utah_sub <- dat[dat$time >= Chill_period$dyn_time[i] &
-                      dat$time < Chill_period$bb_datetime[i],]
-    
-    # Calculate difference between min and max chill accumulation within period
-    Chill_period$dyn_acc[i] <- max(utah_sub$dyn) - min(utah_sub$dyn)
-    
+    Chill_period$utah_acc[i]  <- max(sub$utah) - min(sub$utah)
+    Chill_period$dyn_acc[i]   <- max(sub$dyn) - min(sub$dyn)
+    Chill_period$GDH[i]       <- max(sub$GDH) - min(sub$GDH)
     
     
     # Save Chill_Period Results
@@ -126,6 +131,20 @@ files2 <- list.files()
 missing <- files[!files %in% files2]
 
 
+#### Probably shift to new script
+# Read Files for Meta Analysis
+dat    <- data.frame()
+
+for(i in 1:length(files2)){
+  data <- read.csv(files2[i])
+  
+  dat  <- rbind(dat, data)
+}
+
+
+ggplot(dat, aes(x = SORTE, y = utah_acc)) +
+  geom_boxplot() + theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ################################
 ?PLS_pheno
