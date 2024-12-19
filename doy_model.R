@@ -38,8 +38,10 @@ obs$SORTE[obs$SORTE %in% unindentified] <- "unidentified"
 ## Subset in calibration & validation dataset
 set.seed(123)
 
+obs$group_key <- do.call(paste, c(obs[c("SORTE", "Phase_id")], sep = "_"))
+
 split_results <- 
-  lapply(split(obs, obs[["SORTE"]]), function(group_data) {
+  lapply(split(obs, obs$group_key), function(group_data) {
   # Randomly shuffle rows
   shuffled_rows <- sample(nrow(group_data))
   split_index <- floor(nrow(group_data) * 0.75)
