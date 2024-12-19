@@ -149,7 +149,42 @@ ggsave("./plots/Site_slopes.png", units = "cm", dpi = 300,
 
 
 # Mapping Slopes
+statistics_shp <- left_join(statistics, stats[,c(1,3:4)], "Stations_id")
+statistics_shp <- vect(statistics_shp, geom = c("geograph.Laenge", "geograph.Breite"),
+                       crs = "EPSG:4326")
 
+statistics_shp <- st_as_sf(statistics_shp)
+
+ggplot() +
+  geom_sf(data = DE, fill = NA, color = "black") +  # Add Germany boundary
+  scale_color_viridis_c() +  # Use a nice color scale
+  coord_sf() +
+  labs(x = "", y = "", fill = "Observation\ncount") +
+  theme_bw() +
+  geom_sf(data = statistics_shp, aes(color = slope), alpha = 0.7) + 
+  facet_wrap(~Phase)
+ggsave("./plots/Slopes_Phenology_Phases.png", units = "cm", dpi = 300,
+       width = 25, height = 15)
+
+
+# Cultivar specific slope maps
+for(i in 1:length(unique(statistics$SORTE))){
+  print(i)
+  
+  statistics_shp_sub <- statistics_shp[statistics_shp$SORTE == unique(statistics$SORTE)[i],]
+  
+  ggplot() +
+    geom_sf(data = DE, fill = NA, color = "black") +  # Add Germany boundary
+    scale_color_viridis_c() +  # Use a nice color scale
+    coord_sf() +
+    labs(x = "", y = "", fill = "Observation\ncount",
+         title = unique(statistics$SORTE)[i]) +
+    theme_bw() +
+    geom_sf(data = statistics_shp_sub, aes(color = slope)) + 
+    facet_wrap(~Phase)
+  ggsave(paste0("./plots/Slopes_Phenology_Phases",unique(statistics$SORTE)[i],".png"), 
+         units = "cm", dpi = 300, width = 25, height = 15)
+}
 
 
 
