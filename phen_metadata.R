@@ -17,8 +17,11 @@ setwd("C:/Docs/MIRO/vegetation_model")
 # Phenology Observations
 obs    <- read.csv("Phenology_Observations.csv")
 
-# Subset to bud break data since 1996
-obs    <- obs[obs$Phase_id == 3 & obs$Referenzjahr > 1995,]
+# Subset to phenology data since 1996
+obs    <- obs[(obs$Phase_id == 3 |
+                 obs$Phase_id == 5 |
+                 obs$Phase_id == 6) &
+                obs$Referenzjahr > 1995,]
 
 
 # Load Station Data
@@ -27,6 +30,10 @@ stats   <- read.table("PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt",
 
 # Join data frames
 obs    <- left_join(obs, stats, "Stations_id")
+
+# Factorize Phase
+obs$Phase <- factor(obs$Phase, 
+                    levels = c("Bud Break", "Bloom start", "Fullbloom"))
 
 # Produce Shapefile for Density Map
 obs_shp <- vect(obs, geom = c("geograph.Laenge", "geograph.Breite"),
@@ -49,60 +56,66 @@ ggplot() +
   coord_sf() +
   labs(x = "", y = "", fill = "Observation\ncount") +
   theme_bw() +
-  geom_sf(data = obs_sf, color = "black", alpha = 0.02)
+  geom_sf(data = obs_sf, color = "black", alpha = 0.001) + 
+  facet_wrap(~Phase)
 ggsave("./plots/DensityMap_All.png", units = "cm", dpi = 300,
-       width = 15, height = 15)
+       width = 25, height = 15)
 
 # Histogram of observations since 1995
 ggplot() +
   geom_histogram(data = obs, aes(x = Referenzjahr), binwidth = 1) +
-  theme_bw() + labs(y = "Count of Bud Break Observations", x = "Year") 
+  theme_bw() + labs(y = "Count of Observations", x = "Year") +
+  facet_wrap(~Phase, ncol = 1)
 ggsave("./plots/Histogram_All.png", units = "cm", dpi = 300,
-       width = 15, height = 10)
+       width = 15, height = 20)
 
 # Frequency table
-freq    <- data.frame(table(obs$SORTE))
+freq    <- obs %>% group_by(SORTE, Phase_id) %>%
+  summarize(n = n())
 
 # Filter only cultivars with less than 60 observations (i.e. less than 2 observations per year)
-freq    <- freq[freq$Freq <= 60,]
+freq    <- freq[freq$n <= 60,]
+unindentified <- unique(freq$SORTE)
 
 # Shift these to the "unidentified" category
-obs$SORTE[obs$SORTE %in% freq$Var1] <- "unidentified"
+obs$SORTE[obs$SORTE %in% unindentified] <- "unidentified"
 
 
 # Cultivar-specific analyses
 # 1. Variation Bud Break Date within Cultivar
   # Calculate mean DOY for each cultivar
 doy  <- obs %>% 
-  group_by(SORTE) %>%
+  group_by(SORTE, Phase) %>%
   summarize(mean_doy = mean(Jultag),
             sd = sd(Jultag))
 
 ggplot() +
   geom_point(data = obs, aes(x = SORTE, y = Jultag, color = geograph.Breite), alpha = 0.2) + 
   theme_bw() +
-  labs(x = "Cultivar", y = "Bud Break [DOY]", color = "Latitude [°]") +
+  labs(x = "Cultivar", y = "DOY", color = "Latitude [°]") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_point(data = doy, aes(x = SORTE, y = mean_doy), shape = "diamond", color = "coral", size = 2.5)
+  geom_point(data = doy, aes(x = SORTE, y = mean_doy), 
+             shape = "diamond", color = "coral", size = 2.5) +
+  facet_wrap(~Phase, ncol = 1)
 ggsave("./plots/Variation_withinVarieties.png", units = "cm", dpi = 300,
-       width = 20, height = 12)
+       width = 20, height = 15)
 
 
 # 2. Variation around bud break date for cultivars
   # Idea: calculate mean for each plot & cultivar; analyze "anomaly" around mean over 29 year period
 # Mean for Plot & Cultivar
 doy  <- obs %>% 
-  group_by(SORTE, Stations_id) %>%
+  group_by(SORTE, Stations_id, Phase) %>%
   summarize(mean_doy = mean(Jultag),
             sd = sd(Jultag),
             n = n())
 
 # Subset to plots with at least 10 observations
 doy <- doy[doy$n >= 10,]
-
+doy_sub <- doy[doy$SORTE == "Starking",]
 
 # Assign Data back to obs df
-obs <- left_join(obs, doy, by = c("Stations_id", "SORTE"))
+obs <- left_join(obs, doy, by = c("Stations_id", "SORTE", "Phase"))
 
 # Calculate anomaly around mean
 obs$anomaly <- obs$Jultag - obs$mean_doy
@@ -112,26 +125,31 @@ ggplot(obs[obs$SORTE != "unidentified" & obs$anomaly <= 100 & !is.na(obs$anomaly
        aes(x = Referenzjahr, y = anomaly)) +
   geom_point(alpha = 0.15) + theme_bw() +
   labs(x = "Year", y = "DOY anomaly [d]", title = "n >= 10") +
-  facet_wrap(~SORTE, scales = "free_y") +
+  facet_grid(SORTE~Phase, scales = "free_y") +
   geom_smooth(method = "lm", se = F)
 ggsave("./plots/Anomaly_around_meanDOY.png", units = "cm", dpi = 300,
-       width = 25, height = 20)
+       width = 25, height = 40)
 
 
 # Extract slope of model & significance of trend
 statistics <- obs[obs$SORTE != "unidentified" & obs$anomaly <= 100 & !is.na(obs$anomaly),] %>%
-  group_by(SORTE) %>%
+  group_by(SORTE, Phase, Stations_id) %>%
   summarize(slope = lm(anomaly ~ Referenzjahr)$coefficients[2],
             sig = MannKendall(anomaly)[["sl"]])
 
-grid.arrange(
-  ggplot(statistics, aes(x = SORTE, y = slope)) +
-  geom_point() + theme_bw() + geom_hline(yintercept = 0, linetype = "dashed") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)),
-  
-  ggplot(statistics, aes(x = SORTE, y = sig)) +
-    geom_point() + theme_bw() + geom_hline(yintercept = 0.05, linetype = "dashed") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)))
+statistics$sig <- ifelse(statistics$sig >= 0.05, F, T)
+
+ggplot(statistics, aes(x = SORTE, y = slope, color = sig)) +
+  #geom_boxplot() + 
+  geom_point(alpha = 0.5) + theme_bw() + geom_hline(yintercept = 0, linetype = "dashed") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  facet_wrap(~Phase, ncol = 1) + labs(x = "", y = "Slope [d/a]", color = "Significant\nTrend")
+ggsave("./plots/Site_slopes.png", units = "cm", dpi = 300,
+       width = 15, height = 20)
+
+
+# Mapping Slopes
+
 
 
 
