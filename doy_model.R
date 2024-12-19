@@ -59,22 +59,43 @@ calibration <- do.call(rbind, lapply(split_results, function(x) x$calibration))
 
 
 # Calculate mean DOY for each cultivar & phase
-doy  <- obs %>% 
+doy  <- validation %>% 
   group_by(SORTE, Phase_id) %>%
   summarize(mean_doy = mean(Jultag),
             sd = sd(Jultag))
 
+# Unite cal & val data
+validation$type <- "validation"
+calibration$type <- "calibration"
+
+obs   <- rbind(validation, calibration)
+obs   <- left_join(obs, doy, by = c("SORTE", "Phase_id"))
+
 # Calculate rmse per variety & phase
-obs     <- left_join(obs, doy, by = c("SORTE", "Phase_id"))
-rmse_df <- obs %>% group_by(SORTE, Phase) %>%
+rmse_df <- obs %>% group_by(SORTE, Phase, type) %>%
   summarize(rmse = rmse(Jultag, mean_doy))
 
 # Calculate rmse per phase for all data
-rmse_df2 <- obs %>% group_by(Phase) %>%
+rmse_df2 <- obs %>% group_by(Phase, type) %>%
   summarize(rmse = rmse(Jultag, mean_doy))
+rmse_df2$SORTE <- "All Data"
 
+# Plotting rmse
 rmse_df$Phase <- factor(rmse_df$Phase, 
                         levels = c("Bud Break", "Bloom start", "Fullbloom"))
-ggplot(rmse_df, aes(x = SORTE, y = rmse)) +
+rmse_df2$Phase <- factor(rmse_df2$Phase, 
+                        levels = c("Bud Break", "Bloom start", "Fullbloom"))
+
+ggplot(rmse_df[rmse_df$SORTE != "unidentified",], aes(x = SORTE, y = rmse, color = type)) +
   theme_bw() + geom_point() + facet_wrap(~Phase, ncol = 1) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "RMSE", color = "Dataset") +
+  geom_point(data = rmse_df2)
+ggsave("./plots/RMSE_doy_model.png", units = "cm", dpi = 300,
+       width = 20, height = 12)
+
+
+# Save RMSE data frame
+rmse_df_all <- rbind(rmse_df, rmse_df2)
+write.csv(rmse_df_all, row.names = F, 
+          "results/rmse_df_all.csv")
