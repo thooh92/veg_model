@@ -36,7 +36,24 @@ obs$SORTE[obs$SORTE %in% unindentified] <- "unidentified"
 
 
 ## Subset in calibration & validation dataset
+set.seed(123)
 
+split_results <- 
+  lapply(split(obs, obs[["SORTE"]]), function(group_data) {
+  # Randomly shuffle rows
+  shuffled_rows <- sample(nrow(group_data))
+  split_index <- floor(nrow(group_data) * 0.75)
+  
+  # Assign rows to validation and calibration sets
+  validation <- group_data[shuffled_rows[1:split_index], ]
+  calibration <- group_data[shuffled_rows[(split_index + 1):nrow(group_data)], ]
+  
+  list(validation = validation, calibration = calibration)
+})
+
+# Combine validation and calibration results
+validation <- do.call(rbind, lapply(split_results, function(x) x$validation))
+calibration <- do.call(rbind, lapply(split_results, function(x) x$calibration))
 
 
 # Calculate mean DOY for each cultivar & phase
@@ -47,7 +64,15 @@ doy  <- obs %>%
 
 # Calculate rmse per variety & phase
 obs     <- left_join(obs, doy, by = c("SORTE", "Phase_id"))
-rmse_df <- obs %>% group_by(SORTE, Phase_id) %>%
+rmse_df <- obs %>% group_by(SORTE, Phase) %>%
   summarize(rmse = rmse(Jultag, mean_doy))
 
+# Calculate rmse per phase for all data
+rmse_df2 <- obs %>% group_by(Phase) %>%
+  summarize(rmse = rmse(Jultag, mean_doy))
 
+rmse_df$Phase <- factor(rmse_df$Phase, 
+                        levels = c("Bud Break", "Bloom start", "Fullbloom"))
+ggplot(rmse_df, aes(x = SORTE, y = rmse)) +
+  theme_bw() + geom_point() + facet_wrap(~Phase, ncol = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
