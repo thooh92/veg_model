@@ -139,14 +139,25 @@ statistics <- obs[obs$SORTE != "unidentified" & obs$anomaly <= 100 & !is.na(obs$
 
 statistics$sig <- ifelse(statistics$sig >= 0.05, F, T)
 
-ggplot(statistics, aes(x = SORTE, y = slope, color = sig)) +
-  #geom_boxplot() + 
-  geom_point(alpha = 0.5) + theme_bw() + geom_hline(yintercept = 0, linetype = "dashed") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
-  facet_wrap(~Phase, ncol = 1) + labs(x = "", y = "Slope [d/a]", color = "Significant\nTrend")
-ggsave("./plots/Site_slopes.png", units = "cm", dpi = 300,
-       width = 15, height = 20)
+# Create mean for phenology phase x variety
+summary_df <- statistics %>% group_by(SORTE, Phase) %>%
+  summarize(mean_slope = mean(slope))
 
+ggplot(statistics, aes(x = SORTE, y = slope)) +
+  #geom_boxplot() + 
+  geom_point(alpha = 0.2, aes(color = sig)) + theme_bw() + 
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  facet_wrap(~Phase, ncol = 1) + labs(x = "", y = "DOY Slope [d/a]", color = "Significant\nTrend") +
+  geom_point(data = summary_df, aes(y = mean_slope)) +
+  guides(color = guide_legend(override.aes = list(alpha = 1)))
+ggsave("./plots/Site_slopes.png", units = "cm", dpi = 300,
+       width = 15, height = 16)
+
+# Count positive and negative slopes
+summary_df$trend <- ifelse(summary_df$mean_slope > 0, "pos", "neg")
+sumsum     <- summary_df %>% group_by(Phase, trend) %>%
+  summarize(n = n())
 
 # Mapping Slopes
 statistics_shp <- left_join(statistics, stats[,c(1,3:4)], "Stations_id")
@@ -310,3 +321,9 @@ ggsave("../plots/Slope_Map_monthly_withMK.png", dpi = 300, units = "cm",
        width = 30, height = 20)
 
   # focus: Boskoop, Weisser Klarapfel, Berlepsch, Golden Delicious, Idared, Jonagold, Ontario
+
+## How many observations in the end?
+obs_sum <- obs %>% group_by(SORTE, Phase) %>%
+  summarize(n = n())
+obs_sum <- obs %>% group_by(Phase) %>%
+  summarize(n = n())
