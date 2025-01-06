@@ -106,38 +106,6 @@ for(k in 1:length(files)){  # 1:839 all files before 10,000 IDs; so remove 839 f
 }
 
 
-
-
-####### COMPARE NAMES
-setwd("../results/chill_acc")
-files2 <- list.files()
-
-
-missing <- files[!files %in% files2]
-missing <- as.numeric(substr(missing, 0, nchar(missing)-4))
-
-# Sites missing cause of NA data
-NA_v <- c(7503, 7828, 8499, 10802, 10971, 11055, 11089, 11292, 12294, 
-12522, 12739, 12773, 12881, 12989, 14673, 19499, 19549)
-
-
-# Load Station Data
-stats   <- read.table("C:/Docs/MIRO/vegetation_model/PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt", 
-                      sep = ";", header = T)
-
-stats_sub <- stats[stats$Stations_id %in% NA_v,]
-
-
-# Map Location of Missing sites
-stats_shp <- vect(stats_sub, geom = c("geograph.Laenge", "geograph.Breite"),
-                  crs = "EPSG:4326")
-plot(stats_shp)
-
-## Check
-# NA: 
-
-
-
 #### Probably shift to new script
 # Read Files for Meta Analysis
 dat    <- data.frame()
