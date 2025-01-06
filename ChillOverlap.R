@@ -10,6 +10,18 @@ library(data.table)
 library(chillR)
 
 # Observations
+obs   <- read.csv("C:/Docs/MIRO/vegetation_model/Phenology_Observations.csv")
+obs   <- obs[obs$Referenzjahr > 1995,]
+
+# Create budbreak datetime object
+obs$date <- 
+  as.POSIXct(as.character(obs$Eintrittsdatum), format = "%Y%m%d")
+
+
+# List Weather Data
+setwd("C:/Docs/MIRO/vegetation_model/dwd_csv")
+
+files <- list.files()
 
 
 # Variety infos (including min CP observed before bud break)
