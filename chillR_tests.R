@@ -12,7 +12,8 @@ library(gridExtra)
 
 # Load Phenology observations
 obs   <- read.csv("C:/Docs/MIRO/vegetation_model/Phenology_Observations.csv")
-obs   <- obs[obs$Phase_id == 3 & obs$Referenzjahr > 1995,]
+obs   <- obs[obs$Referenzjahr > 1995 & (obs$Phase_id == 3 |
+               obs$Phase_id == 5 | obs$Phase_id == 6),]
 
 # Create budbreak datetime object
 obs$bb_datetime <- 
@@ -24,7 +25,8 @@ setwd("C:/Docs/MIRO/vegetation_model/dwd_csv")
 
 files <- list.files()
 
-for(k in 1:254){
+
+for(k in 1:length(files)){  # 1:839 all files before 10,000 IDs; so remove 839 files at end when processing other data
   print(k)
 
   # Load weather data
@@ -58,26 +60,7 @@ for(k in 1:254){
            GDH = GDH(air_temperature),
            doy_July = 1:length(air_temperature)/24) %>%
     ungroup
-  
-  # Plot
-  grid.arrange(
-    ggplot(dat[!is.na(dat$year),], aes(x = doy_July, y = utah, 
-                                     color = as.factor(phen_year))) +
-    geom_line() + theme_bw() +
-    labs(x = "Day after July 1st", y = "Accumulated\nUtah Chill Units",
-         color = "Phenological Year"),
-    
-    ggplot(dat[!is.na(dat$year),], aes(x = doy_July, y = dyn, 
-                                       color = as.factor(phen_year))) +
-      geom_line() + theme_bw() +
-      labs(x = "Day after July 1st", y = "Accumulated\nChill Portions",
-           color = "Phenological Year"),
-    
-    ggplot(dat[!is.na(dat$year),], aes(x = doy_July, y = GDH, 
-                                       color = as.factor(phen_year))) +
-      geom_line() + theme_bw() +
-      labs(x = "Day after July 1st", y = "Accumulated\nGDH",
-           color = "Phenological Year"))
+
 
   # Extract starting day of chill accumulation according to Utah logic
   Chill_start <- dat[!is.na(dat$phen_year),] %>% 
@@ -111,13 +94,15 @@ for(k in 1:254){
     Chill_period$utah_acc[i]  <- max(sub$utah) - min(sub$utah)
     Chill_period$dyn_acc[i]   <- max(sub$dyn) - min(sub$dyn)
     Chill_period$GDH[i]       <- max(sub$GDH) - min(sub$GDH)
-    
-    
+
+  }
+  
     # Save Chill_Period Results
-    write.csv(Chill_period[c(4,15,14,1:3,16:18)],
+    write.csv(Chill_period[c(6,15,14,1:3,16:18)],
               paste0("../results/chill_acc/", files[k]),
               row.names = F)
-  }}
+  
+  }
 }
 
 
@@ -129,6 +114,28 @@ files2 <- list.files()
 
 
 missing <- files[!files %in% files2]
+missing <- as.numeric(substr(missing, 0, nchar(missing)-4))
+
+# Sites missing cause of NA data
+NA_v <- c(7503, 7828, 8499, 10802, 10971, 11055, 11089, 11292, 12294, 
+12522, 12739, 12773, 12881, 12989, 14673, 19499, 19549)
+
+
+# Load Station Data
+stats   <- read.table("C:/Docs/MIRO/vegetation_model/PH_Beschreibung_Phaenologie_Stationen_Jahresmelder.txt", 
+                      sep = ";", header = T)
+
+stats_sub <- stats[stats$Stations_id %in% NA_v,]
+
+
+# Map Location of Missing sites
+stats_shp <- vect(stats_sub, geom = c("geograph.Laenge", "geograph.Breite"),
+                  crs = "EPSG:4326")
+plot(stats_shp)
+
+## Check
+# NA: 
+
 
 
 #### Probably shift to new script
@@ -142,12 +149,25 @@ for(i in 1:length(files2)){
 }
 
 
-ggplot(dat, aes(x = SORTE, y = utah_acc)) +
+ggplot(dat, aes(x = SORTE, y = dyn_acc)) +
   geom_boxplot() + theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+# Min CP per variety
+CP <- dat[dat$dyn_acc != "-Inf",] %>% group_by(SORTE) %>%
+  summarize(CP_min = min(dyn_acc, na.rm = T),
+            CP_mean = mean(dyn_acc),
+            CP_max = max(dyn_acc),
+            n = n())
+
+CP <- CP[CP$n > 60,]
+CP$range <- CP$CP_max - CP$CP_min
+
+ggplot(CP, aes(x = n, y = range)) +
+  geom_point() + theme_bw() +
+  xlim(0,2500)
 ################################
-?PLS_pheno
+
 
 
 
