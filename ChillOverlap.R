@@ -44,7 +44,7 @@ CP <- dat[dat$dyn_acc != "-Inf",] %>% group_by(SORTE) %>%
             CP_max = max(dyn_acc),
             n = n())
 
-CP <- CP[CP$n > 60 & !is.na(CP$SORTE),]
+CP <- CP[CP$n > 60*3 & !is.na(CP$SORTE),]
 
 ggplot(CP, aes(x = n, y = CP_min)) +
   geom_point() + theme_bw() + 
@@ -86,32 +86,108 @@ ggplot(HA[HA$SORTE != "unidentified",], aes(x = n, y = b2)) +
 ggsave("../../plots/n_vs_b2.png", units = "cm", dpi = 300,
        width = 10, height = 12)
 
-
-# Initiate CP vector for cultivar
-CPs <- seq(30, CP$CP_min[1], 1)
-##########################
-
-
-
-
-
-
-
-
-
-################################
-# Variety infos (including min CP observed before bud break)
-
-
-
-
-
-
-
-
 # Estimate b1 for each phenological stage
-b1 <- tst # Calculate min HR found between day of CR fulfillment and phenological stage investigated
+## Connect to weather data folder
+setwd("C:/Docs/MIRO/vegetation_model/dwd_csv")
+
+files <- list.files()
+
+## Initiate loop
+for(k in 1:length(files)){
+print(k)
+
+# Load weather data
+dat   <- read.csv(files[k])
+
+# Load coresponding phenology data
+Obs_sub    <- obs[obs$Stations_id == unique(dat$phen_ID),]
+
+# Manipulate datetime format
+dat$time <- as.POSIXct(dat$time, format = "%Y-%m-%d %H:%M:%S")
+dat$year <- as.numeric(format(dat$time, format = "%Y"))
+dat$doy  <- as.numeric(format(dat$time, format = "%j"))
 
 
+# Assign "phenological year" info; i.e. divide timeline starting July
+dat$phen_year <- ifelse(dat$doy > 182, dat$year + 1, dat$year)
+dat           <- dat[!is.na(dat$phen_year) &
+                       dat$phen_year %in% Obs_sub$Referenzjahr,]
 
+# Remove NAs
+dat   <- dat[!is.na(dat$air_temperature),]
+
+if(nrow(dat) > 0){
+  # Apply Models
+  dat <- dat %>%
+    group_by(phen_year) %>%
+    mutate(utah = Utah_Model(air_temperature),
+           dyn = Dynamic_Model(air_temperature),
+           GDH = GDH(air_temperature),
+           doy_July = 1:length(air_temperature)/24) %>%
+    ungroup
+
+  # Create df to store Heat Accumulation periods
+  HA_periods <- data.frame()
+  
+  for(s in 1:length(unique(Obs_sub$SORTE))){
+    # Get cultivar info
+    SORTE <- unique(Obs_sub$SORTE)[s]
+    
+    # Get CR sequence
+    CRs <- seq(30, CP$CP_min[CP$SORTE == SORTE], 1)
+    
+    # Subset data to cultivar
+    Obs_sub_sub  <- Obs_sub[Obs_sub$SORTE == SORTE,]
+    
+  for(y in 1:length(unique(Obs_sub_sub$Referenzjahr))){
+    # Extract year
+    yr       <- unique(Obs_sub_sub$Referenzjahr)[y]
+    
+    # Subset data to year
+    dat_sub  <- dat[dat$phen_year == yr,]
+    
+    # Get CP start value (1st of September)
+    CP_start <- dat_sub$dyn[dat_sub$time == as.POSIXct(paste0(yr-1,"-09-01 00:00:00"))]
+    
+    # Loop through all CRs to investigate for cultivar
+    for(z in 1:length(CRs)){ 
+      # Get CP value where CR is fulfilled
+      CP_end   <- CP_start + CRs[z]
+      
+      # Remove values < 0
+      dat_sub_sub <- dat_sub[dat_sub$dyn > CP_end,]
+      
+      # Get time of that CR fulfillment
+      CP_time  <- dat_sub_sub$time[which.min(dat_sub_sub$dyn)]
+      
+      # Subset to observations of reference year
+      Obs_sub3 <- Obs_sub_sub[Obs_sub$Referenzjahr == yr,]
+      
+      if(nrow(Obs_sub_sub) > 0){
+      
+      # Attach CP_time
+      Obs_sub3$CP_time <- CP_time
+      
+      # Add CR information
+      Obs_sub3$CR      <- CRs[z]
+      
+      # Calculate heat accumulation for these periods
+      for(i in 1:nrow(Obs_sub3)){
+        # Subset to period
+        sub <- dat[dat$time >= Obs_sub3$CP_time[i] &
+                     dat$time < Obs_sub3$date[i],]
+        
+        # Calculate GDH accumulation within period
+        Obs_sub3$GDH[i]       <- max(sub$GDH) - min(sub$GDH)
+        
+      }
+      
+      # Store in HA_periods
+      HA_periods <- rbind(HA_periods, Obs_sub3)
+      }}}
+  }
+  
+  ## Save files
+  write.csv(HA_periods, paste0("../results/b1/",files[k]))
+}}
 
