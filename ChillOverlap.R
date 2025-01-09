@@ -92,8 +92,12 @@ setwd("C:/Docs/MIRO/vegetation_model/dwd_csv")
 
 files <- list.files()
 
+# Remove all cultivars with insufficient entries, e.g. Melrose
+obs   <- obs[obs$SORTE %in% CP$SORTE,]
+
+
 ## Initiate loop
-for(k in 117:length(files)){
+for(k in 116:length(files)){
 print(k)
 
 # Load weather data
@@ -107,17 +111,20 @@ dat$time <- as.POSIXct(dat$time, format = "%Y-%m-%d %H:%M:%S")
 dat$year <- as.numeric(format(dat$time, format = "%Y"))
 dat$doy  <- as.numeric(format(dat$time, format = "%j"))
 
+# Create month column to assign "phenological year"
+dat$month<- as.numeric(format(dat$time, format = "%m"))
 
 # Assign "phenological year" info; i.e. divide timeline starting July
-dat$phen_year <- ifelse(dat$doy > 182, dat$year + 1, dat$year)
+dat$phen_year <- ifelse(dat$month >= 7, dat$year + 1, dat$year)
 dat           <- dat[!is.na(dat$phen_year) &
                        dat$phen_year %in% Obs_sub$Referenzjahr,]
 
-# Remove NAs
-dat   <- dat[!is.na(dat$air_temperature),]
+# Remove NAs & month column
+dat   <- dat[!is.na(dat$air_temperature),-6]
 
 # 2nd Subset: are there data of phenological year in the calendar year before the observation?
 dat_check <- dat[dat$year %in% Obs_sub$Referenzjahr,]
+
 
 if(nrow(dat) > 0){
   # Apply Models

@@ -26,7 +26,7 @@ setwd("C:/Docs/MIRO/vegetation_model/dwd_csv")
 files <- list.files()
 
 
-for(k in 1:length(files)){  # 1:839 all files before 10,000 IDs; so remove 839 files at end when processing other data
+for(k in 1:length(files)){  
   print(k)
 
   # Load weather data
@@ -36,20 +36,21 @@ for(k in 1:length(files)){  # 1:839 all files before 10,000 IDs; so remove 839 f
   Obs_sub    <- obs[obs$Stations_id == unique(dat$phen_ID),]
   
   # Manipulate datetime format
-  dat$time <- as.POSIXct(dat$time, format = "%Y-%m-%d %H:%M:%S")
+  dat$time <- as.POSIXct(dat$time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
   dat$year <- as.numeric(format(dat$time, format = "%Y"))
   dat$doy  <- as.numeric(format(dat$time, format = "%j"))
   
-  
+  # Create month column to assign "phenological year"
+  dat$month<- as.numeric(format(dat$time, format = "%m"))
   
   # Assign "phenological year" info; i.e. divide timeline starting July
-  dat$phen_year <- ifelse(dat$doy > 182, dat$year + 1, dat$year)
+  dat$phen_year <- ifelse(dat$month >= 7, dat$year + 1, dat$year)
   dat           <- dat[!is.na(dat$phen_year) &
                          dat$phen_year %in% Obs_sub$Referenzjahr,]
   
   
   # Remove NAs
-  dat   <- dat[!is.na(dat$air_temperature),]
+  dat   <- dat[!is.na(dat$air_temperature),-6]
   
   if(nrow(dat) > 0){
   # Apply Models
