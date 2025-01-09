@@ -107,7 +107,7 @@ dat   <- read.csv(files[k])
 Obs_sub    <- obs[obs$Stations_id == unique(dat$phen_ID),]
 
 # Manipulate datetime format
-dat$time <- as.POSIXct(dat$time, format = "%Y-%m-%d %H:%M:%S")
+dat$time <- as.POSIXct(dat$time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
 dat$year <- as.numeric(format(dat$time, format = "%Y"))
 dat$doy  <- as.numeric(format(dat$time, format = "%j"))
 
