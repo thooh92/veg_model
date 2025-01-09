@@ -93,7 +93,7 @@ setwd("C:/Docs/MIRO/vegetation_model/dwd_csv")
 files <- list.files()
 
 ## Initiate loop
-for(k in 1:length(files)){
+for(k in 117:length(files)){
 print(k)
 
 # Load weather data
@@ -115,6 +115,9 @@ dat           <- dat[!is.na(dat$phen_year) &
 
 # Remove NAs
 dat   <- dat[!is.na(dat$air_temperature),]
+
+# 2nd Subset: are there data of phenological year in the calendar year before the observation?
+dat_check <- dat[dat$year %in% Obs_sub$Referenzjahr,]
 
 if(nrow(dat) > 0){
   # Apply Models
@@ -146,6 +149,8 @@ if(nrow(dat) > 0){
     # Subset data to year
     dat_sub  <- dat[dat$phen_year == yr,]
     
+    if(nrow(dat_sub) > 8000 | nrow(dat_sub) == 0){
+    
     # Get CP start value (1st of September)
     CP_start <- dat_sub$dyn[dat_sub$time == as.POSIXct(paste0(yr-1,"-09-01 00:00:00"))]
     
@@ -161,7 +166,7 @@ if(nrow(dat) > 0){
       CP_time  <- dat_sub_sub$time[which.min(dat_sub_sub$dyn)]
       
       # Subset to observations of reference year
-      Obs_sub3 <- Obs_sub_sub[Obs_sub$Referenzjahr == yr,]
+      Obs_sub3 <- Obs_sub_sub[Obs_sub_sub$Referenzjahr == yr,]
       
       if(nrow(Obs_sub_sub) > 0){
       
@@ -185,9 +190,44 @@ if(nrow(dat) > 0){
       # Store in HA_periods
       HA_periods <- rbind(HA_periods, Obs_sub3)
       }}}
-  }
+  }}
   
   ## Save files
-  write.csv(HA_periods, paste0("../results/b1/",files[k]))
-}}
+  write.csv(HA_periods, paste0("../results/b1/",files[k]), row.names = F)
+}
+}
+
+
+# Approximate b1 summarized per cultivar
+## List Data
+setwd("../results/b1")
+files <- list.files()
+
+# Read files
+dat    <- data.frame()
+
+for(i in 1:length(files)){
+  data <- read.csv(files[i])
+  
+  dat  <- rbind(dat, data)
+}
+
+## b1 estimate per cultivar and CR
+b1 <- dat %>% group_by(SORTE, Phase, CR) %>%
+  summarize(b1_est = min(GDH))
+
+### Create factor with correct levelling
+b1$Phase <- factor(b1$Phase, levels = c("Bud Break", "Bloom start", "Fullbloom"))
+
+### Plot
+ggplot(b1, aes(x = CR, y = b1_est, color = Phase)) +
+  theme_bw() + facet_wrap(~SORTE) +
+  geom_point(alpha = 0.3) +
+  labs(x = "Chilling Requirement [CP]", y = expression(beta[1] * " Estimate [GDH]"))
+ggsave("../../plots/b1_estimate.png", dpi = 300, units = "cm", width = 22, height = 18)
+
+
+
+
+
 
