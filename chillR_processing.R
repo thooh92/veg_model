@@ -1,6 +1,6 @@
 ## Author: Thomas Ohnemus
 ## Date: 12/12/2024
-## Testing ChillR package
+## ChillR Processing of Raw Data
 
 rm(list = ls())
 
@@ -8,7 +8,40 @@ rm(list = ls())
 library(tidyverse)
 library(chillR)
 library(gridExtra)
+library(minio.s3)
 
+
+
+# Download processed data from minio
+## Credentials
+Sys.setenv("AWS_ACCESS_KEY_ID" = 'allaccess',
+           "AWS_SECRET_ACCESS_KEY" = 'wDoXiBjUaNQBG2BbGusEbX7E2Zx8LrUQrovR4aLp',
+           "AWS_DEFAULT_REGION" = 'test',
+           "AWS_S3_ENDPOINT" = 'minio.ufz.de:443')
+
+
+# List files in bucket/directory
+objects <- minio.s3::get_bucket(
+  bucket = 'met-ohnemus-miro',
+  prefix = "veg_model/dwd_csvs/",
+  base_url = 'https://minio.ufz.de:443',
+  use_https = TRUE
+)
+
+# Iterate over the objects and download them
+for (object in objects) {
+  # Extract the object key (path in the bucket)
+  file_key <- object$Key
+  file_name <- basename(file_key)  # Extract the file name
+  
+  # Download each file to the local directory
+  minio.s3::save_object(
+    object = file_key,
+    bucket = 'met-ohnemus-miro',
+    file = file.path("C:/Docs/MIRO/vegetation_model/dwd_csv", file_name),
+    use_https = TRUE
+  )
+}
 
 # Load Phenology observations
 obs   <- read.csv("C:/Docs/MIRO/vegetation_model/Phenology_Observations.csv")
