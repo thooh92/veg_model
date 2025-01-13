@@ -10,8 +10,6 @@ library(chillR)
 library(gridExtra)
 library(minio.s3)
 
-
-
 # Download processed data from minio
 ## Credentials
 Sys.setenv("AWS_ACCESS_KEY_ID" = 'allaccess',
@@ -21,12 +19,34 @@ Sys.setenv("AWS_ACCESS_KEY_ID" = 'allaccess',
 
 
 # List files in bucket/directory
-objects <- minio.s3::get_bucket(
-  bucket = 'met-ohnemus-miro',
-  prefix = "veg_model/dwd_csvs/",
-  base_url = 'https://minio.ufz.de:443',
-  use_https = TRUE
-)
+objects <- 
+  minio.s3::get_bucket(
+    bucket = 'met-ohnemus-miro',
+    prefix = "veg_model/dwd_csvs/",
+    base_url = 'https://minio.ufz.de:443',
+    use_https = TRUE
+  )
+
+
+while(length(objects) < 2300){
+  # Get last key as marker
+  last_key <- objects[length(objects)]$Contents$Key
+  
+  # Get subset of keys in minio
+  sub <- 
+    minio.s3::get_bucket(
+    bucket = 'met-ohnemus-miro',
+    prefix = "veg_model/dwd_csvs/",
+    base_url = 'https://minio.ufz.de:443',
+    marker = last_key,
+    use_https = TRUE
+    )
+
+  # Unite with objects
+  objects <- c(objects, sub)
+  
+}
+
 
 # Iterate over the objects and download them
 for (object in objects) {
