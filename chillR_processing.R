@@ -78,7 +78,6 @@ setwd("C:/Docs/MIRO/vegetation_model/dwd_csv")
 
 files <- list.files()
 
-
 for(k in 1:length(files)){  
   print(k)
 
@@ -150,6 +149,9 @@ for(k in 1:length(files)){
     Chill_period$GDH[i]       <- max(sub$GDH) - min(sub$GDH)
 
   }
+  
+  # Remove -Inf before saving
+  Chill_period <- Chill_period[Chill_period$dyn_acc != "-Inf",]
   
     # Save Chill_Period Results
     write.csv(Chill_period[c(6,15,14,1:3,16:18)],

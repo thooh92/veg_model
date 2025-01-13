@@ -97,7 +97,7 @@ obs   <- obs[obs$SORTE %in% CP$SORTE,]
 
 
 ## Initiate loop
-for(k in 116:length(files)){
+for(k in 1:length(files)){
 print(k)
 
 # Load weather data
@@ -220,21 +220,17 @@ for(i in 1:length(files)){
 }
 
 ## b1 estimate per cultivar and CR
-b1 <- dat %>% group_by(SORTE, Phase, CR) %>%
+b1 <- dat[dat$GDH != "-Inf",] %>% group_by(SORTE, Phase, CR) %>%
   summarize(b1_est = min(GDH))
 
 ### Create factor with correct levelling
 b1$Phase <- factor(b1$Phase, levels = c("Bud Break", "Bloom start", "Fullbloom"))
 
 ### Plot
-ggplot(b1, aes(x = CR, y = b1_est, color = Phase)) +
+ggplot(b1[b1$SORTE != "unidentified",], aes(x = CR, y = b1_est, color = Phase)) +
   theme_bw() + facet_wrap(~SORTE) +
   geom_point(alpha = 0.3) +
   labs(x = "Chilling Requirement [CP]", y = expression(beta[1] * " Estimate [GDH]"))
 ggsave("../../plots/b1_estimate.png", dpi = 300, units = "cm", width = 22, height = 18)
-
-
-
-
 
 
